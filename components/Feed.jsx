@@ -1,14 +1,19 @@
 'use client';
 import { useState, useEffect, useMemo } from "react"
 import PromptCard from "./PromptCard";
+import SkeletonLoader from "./SkeletonLoader";
 
-const PromptCardList = ({data, handleTagClick}) => {
+const PromptCardList = ({data, handleTagClick, loading, noposts}) => {
   // change the CSS for this outer div
+  console.log(`Loading state : ${loading}`);
+  
   return (
-    <div className="mt-16 prompt_layer"> 
-      {data.length === 0 ? (
-        <p>Loading...</p>
-      ) : (
+    <div className="mt-16 w-full flex flex-row justify-between flex-wrap"> 
+      {loading? (
+        <SkeletonLoader />
+      ) : 
+      (!loading && noposts && !(data?.length) && <p>No Posts yet ...</p>  )||
+      (
         data.map((val) => (
           <PromptCard 
             key={val._id}
@@ -16,7 +21,8 @@ const PromptCardList = ({data, handleTagClick}) => {
             post={val}
           />
         ))
-      )}
+      )
+      }
     </div>
   );
   
@@ -27,24 +33,43 @@ const Feed = () => {
   const [searchText, setSearchText] = useState("");
   const [data, setData] = useState([]);
   const [filterData, setFilterData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [noPosts, setNoPosts] = useState(false);
   
   useEffect(() => {
+    
+    const timeOut = setTimeout(() => {
+      setIsLoading(false);
+      setNoPosts(true);
+    }, 15000);
+    
     const fetchPosts = async () => {
       try {
           const posts = await fetch("/api/prompt");
           if (!posts.ok) {
+              setNoPosts(true);
               throw new Error(`Error: ${posts.status}`);
           }
           const post_data = await posts.json();
-          setData(post_data);
-          setFilterData(post_data);
+          
+          if(post_data?.length > 0) {
+            setData(post_data);
+            setFilterData(post_data);
+          } else {
+            setNoPosts(true);
+          }
       } catch (error) {
           console.log(error);
-          
+          setNoPosts(true);
+      } finally {
+        setIsLoading(false);
       }
     };
     
     fetchPosts();
+    
+    return () => clearTimeout(timeOut);
+
   },[]);  
   
   useEffect(() => {
@@ -92,28 +117,6 @@ const Feed = () => {
     setSearchText(query);
   }
   
-  // const handleSearchChange = (e) => {
-  //   e.preventDefault();
-  //   const query = e.target.value.toLowerCase();
-  //   setSearchText(query);
-    
-  //   if(!data.length) {
-  //     return
-  //   }
-  //   if(query === "") {
-  //     setFilterData(data);
-  //     return
-  //   }
-  //   const filteredData = data.filter((val, ind) => {
-  //     let userName = val?.creator.username.toLowerCase();
-  //     let dataPrompt = val?.prompt.toLowerCase();
-  //     let dataTag = val?.tag.toLowerCase();
-  //     return (userName.includes(query) 
-  //     || dataPrompt.includes(query) || dataTag.includes(query))
-  //   });
-  //   setFilterData(filteredData);
-  // }
-  
   return (
     <div className="feed">
       <form className="relative w-full flex-center">
@@ -130,6 +133,8 @@ const Feed = () => {
       <PromptCardList 
         data={filterData}
         handleTagClick={(tag) => {setSearchText(tag)}}
+        loading={isLoading}
+        noposts={noPosts}
       />
       
     </div>
